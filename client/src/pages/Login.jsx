@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { userAPI } from '../api/users';
 import { useCart } from '../context/CartContext';
+import { useToast } from '../context/ToastContext';
 
 const Login = () => {
   const navigate = useNavigate();
   const { syncCartOnLogin } = useCart();
+  const { success, error: showError } = useToast();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -31,11 +33,13 @@ const Login = () => {
 
       if (response.success) {
         await syncCartOnLogin();
+        success(`Welcome back, ${response.data.user.name}! You have been logged in successfully.`);
         navigate('/');
         window.location.reload();
       }
     } catch (err) {
       setError(err.message);
+      showError(err.message);
     } finally {
       setLoading(false);
     }

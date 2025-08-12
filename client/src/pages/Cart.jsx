@@ -1,15 +1,21 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { useToast } from '../context/ToastContext';
+import { useConfirmation } from '../context/ConfirmationContext';
 import CartItem from '../components/CartItem';
 
 const Cart = () => {
   const { items, getTotalItems, getTotalPrice, clearCart } = useCart();
+  const { success, info } = useToast();
+  const { confirmClearCart } = useConfirmation();
   const navigate = useNavigate();
 
-  const handleClearCart = () => {
-    if (window.confirm('Are you sure you want to clear your cart?')) {
+  const handleClearCart = async () => {
+    const confirmed = await confirmClearCart();
+    if (confirmed) {
       clearCart();
+      success('Your cart has been cleared successfully.');
     }
   };
 

@@ -2,10 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { userAPI } from '../api/users';
+import { useToast } from '../context/ToastContext';
+import { useConfirmation } from '../context/ConfirmationContext';
 
 const Navbar = () => {
   const { getTotalItems, loadCart } = useCart();
   const navigate = useNavigate();
+  const { success } = useToast();
+  const { confirmLogout } = useConfirmation();
   const currentUser = userAPI.getCurrentUser();
   const isLoggedIn = userAPI.isLoggedIn();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -27,11 +31,15 @@ const Navbar = () => {
   }, []);
 
   const handleLogout = async () => {
-    userAPI.logoutUser();
-    // Reload cart for guest mode
-    await loadCart();
-    navigate('/');
-    window.location.reload();
+    const confirmed = await confirmLogout();
+    if (confirmed) {
+      userAPI.logoutUser();
+      success('You have been logged out successfully.');
+      // Reload cart for guest mode
+      await loadCart();
+      navigate('/');
+      window.location.reload();
+    }
   };
 
   const toggleMobileMenu = () => {

@@ -1,14 +1,17 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { useToast } from '../context/ToastContext';
 
 const ProductCard = ({ product }) => {
   const { addToCart, getCartItem } = useCart();
+  const { success } = useToast();
   const cartItem = getCartItem(product.id);
 
   const handleAddToCart = (e) => {
     e.preventDefault(); // Prevent navigation when clicking the button
     addToCart(product, 1);
+    success(`${product.name} has been added to your cart!`);
   };
 
   return (

@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { userAPI } from '../api/users';
 import { useCart } from '../context/CartContext';
+import { useToast } from '../context/ToastContext';
 
 const Register = () => {
   const navigate = useNavigate();
   const { syncCartOnLogin } = useCart();
+  const { success, error: showError } = useToast();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -70,11 +72,13 @@ const Register = () => {
       
       if (response.success) {
         await syncCartOnLogin();
+        success(`Welcome, ${response.data.user.name}! Your account has been created successfully.`);
         navigate('/');
         window.location.reload();
       }
     } catch (err) {
       setError(err.message);
+      showError(err.message);
     } finally {
       setLoading(false);
     }

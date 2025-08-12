@@ -1,19 +1,32 @@
 import React from 'react';
 import { useCart } from '../context/CartContext';
+import { useToast } from '../context/ToastContext';
+import { useConfirmation } from '../context/ConfirmationContext';
 
 const CartItem = ({ item }) => {
   const { updateQuantity, removeFromCart } = useCart();
+  const { success } = useToast();
+  const { confirmDelete } = useConfirmation();
 
-  const handleQuantityChange = (newQuantity) => {
+  const handleQuantityChange = async (newQuantity) => {
     if (newQuantity <= 0) {
-      removeFromCart(item.id);
+      const confirmed = await confirmDelete(item.name);
+      if (confirmed) {
+        removeFromCart(item.id);
+        success(`${item.name} has been removed from your cart.`);
+      }
     } else {
       updateQuantity(item.id, newQuantity);
+      success(`Updated quantity for ${item.name}.`);
     }
   };
 
-  const handleRemove = () => {
-    removeFromCart(item.id);
+  const handleRemove = async () => {
+    const confirmed = await confirmDelete(item.name);
+    if (confirmed) {
+      removeFromCart(item.id);
+      success(`${item.name} has been removed from your cart.`);
+    }
   };
 
   return (

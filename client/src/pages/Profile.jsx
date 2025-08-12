@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { userAPI } from '../api/users';
 import { cartAPI } from '../api/cart';
+import { useToast } from '../context/ToastContext';
 
 const Profile = () => {
+  const { success: showSuccess, error: showError } = useToast();
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -125,12 +127,14 @@ const Profile = () => {
         setProfile(updatedProfile.data);
         setIsEditing(false);
         setSuccess('Profile updated successfully!');
+        showSuccess('Your profile has been updated successfully!');
         setTimeout(() => setSuccess(null), 3000);
       } else {
         throw new Error('Failed to update profile');
       }
     } catch (error) {
       setError(error.message);
+      showError(error.message);
     } finally {
       setSaving(false);
     }
