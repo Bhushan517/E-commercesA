@@ -93,25 +93,16 @@ const Checkout = () => {
       // Validate form
       validateForm();
 
-      // Prepare order data
-      const orderData = {
-        user_id: currentUser.id,
-        items: items.map(item => ({
-          product_id: item.id,
-          quantity: item.quantity
-        }))
-      };
-
-      // Create order
-      const response = await orderAPI.createOrder(orderData);
+      // Create order from cart items
+      const response = await orderAPI.createOrderFromCart();
       
       if (response.success) {
         setSuccess(true);
         clearCart();
-        
-        // Redirect to success page after 3 seconds
+
+        // Redirect to orders page after 3 seconds
         setTimeout(() => {
-          navigate('/');
+          navigate('/orders');
         }, 3000);
       }
     } catch (err) {
@@ -191,15 +182,23 @@ const Checkout = () => {
           <p className="text-gray-600 mb-8">
             Thank you for your order. You will receive a confirmation email shortly.
             <br />
-            Redirecting to home page in 3 seconds...
+            Redirecting to your orders page in 3 seconds...
           </p>
-          
-          <button 
-            onClick={() => navigate('/')}
-            className="btn-primary"
-          >
-            Go to Home
-          </button>
+
+          <div className="space-x-4">
+            <button
+              onClick={() => navigate('/orders')}
+              className="btn-primary"
+            >
+              View My Orders
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              className="btn-secondary"
+            >
+              Continue Shopping
+            </button>
+          </div>
         </div>
       </div>
     );

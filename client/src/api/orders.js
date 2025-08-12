@@ -42,6 +42,16 @@ export const orderAPI = {
     }
   },
 
+  // Create order from cart
+  createOrderFromCart: async () => {
+    try {
+      const response = await api.post('/orders/from-cart');
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to create order from cart');
+    }
+  },
+
   // Update order status
   updateOrderStatus: async (id, status) => {
     try {

@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { userAPI } from '../api/users';
 import { cartAPI } from '../api/cart';
+import { orderAPI } from '../api/orders';
 import { useToast } from '../context/ToastContext';
 import PhotoUpload from '../components/PhotoUpload';
 
 const Profile = () => {
   const { success: showSuccess, error: showError } = useToast();
+  const location = useLocation();
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -15,6 +18,8 @@ const Profile = () => {
   const [success, setSuccess] = useState(null);
   const [activeTab, setActiveTab] = useState('personal');
   const [stats, setStats] = useState({ orders: 0, cartItems: 0, wishlist: 0 });
+  const [orders, setOrders] = useState([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -35,7 +40,21 @@ const Profile = () => {
   useEffect(() => {
     loadUserData();
     loadUserStats();
-  }, []);
+
+    // Check URL parameters for tab
+    const urlParams = new URLSearchParams(location.search);
+    const tabParam = urlParams.get('tab');
+    if (tabParam && ['personal', 'orders', 'history', 'security', 'preferences'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [location]);
+
+  // Load orders when orders tab is active
+  useEffect(() => {
+    if (activeTab === 'orders' || activeTab === 'history') {
+      loadUserOrders();
+    }
+  }, [activeTab]);
 
   const loadUserData = async () => {
     try {
@@ -87,14 +106,44 @@ const Profile = () => {
 
   const loadUserStats = async () => {
     try {
+      const currentUser = userAPI.getCurrentUser();
+      if (!currentUser) return;
+
       // Load cart stats
       const cartResponse = await cartAPI.getCartSummary();
+
+      // Load orders count
+      let ordersCount = 0;
+      try {
+        const ordersResponse = await orderAPI.getOrdersByUserId(currentUser.id);
+        ordersCount = ordersResponse.count || 0;
+      } catch (error) {
+        console.error('Failed to load orders count:', error);
+      }
+
       setStats(prev => ({
         ...prev,
+        orders: ordersCount,
         cartItems: cartResponse.data.totalItems || 0
       }));
     } catch (error) {
       console.error('Failed to load user stats:', error);
+    }
+  };
+
+  const loadUserOrders = async () => {
+    try {
+      setLoadingOrders(true);
+      const currentUser = userAPI.getCurrentUser();
+      if (!currentUser) return;
+
+      const response = await orderAPI.getOrdersByUserId(currentUser.id);
+      setOrders(response.data || []);
+    } catch (error) {
+      console.error('Failed to load orders:', error);
+      showError('Failed to load your orders');
+    } finally {
+      setLoadingOrders(false);
     }
   };
 
@@ -379,6 +428,8 @@ const Profile = () => {
             <nav className="flex space-x-8 px-6">
               {[
                 { id: 'personal', name: 'Personal Info', icon: 'user' },
+                { id: 'orders', name: 'My Orders', icon: 'shopping-bag' },
+                { id: 'history', name: 'Order History', icon: 'clock' },
                 { id: 'security', name: 'Security', icon: 'shield' },
                 { id: 'preferences', name: 'Preferences', icon: 'cog' }
               ].map((tab) => (
@@ -560,6 +611,187 @@ const Profile = () => {
                     </button>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {activeTab === 'orders' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-medium text-gray-900">My Orders</h3>
+                  <p className="text-sm text-gray-600">
+                    {stats.orders} total order{stats.orders !== 1 ? 's' : ''}
+                  </p>
+                </div>
+
+                {loadingOrders ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                  </div>
+                ) : orders.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                      </svg>
+                    </div>
+                    <h4 className="text-lg font-medium text-gray-900 mb-2">No orders yet</h4>
+                    <p className="text-gray-600 mb-6">When you place orders, they'll appear here.</p>
+                    <button
+                      onClick={() => window.location.href = '/products'}
+                      className="btn-primary"
+                    >
+                      Start Shopping
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {orders.filter(order => order.status === 'pending' || order.status === 'shipped').map((order) => (
+                      <div key={order.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <h4 className="font-medium text-gray-900">Order #{order.id}</h4>
+                            <p className="text-sm text-gray-600">
+                              {new Date(order.createdAt).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium text-gray-900">${parseFloat(order.totalPrice).toFixed(2)}</p>
+                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                              order.status === 'pending'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : order.status === 'shipped'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-green-100 text-green-800'
+                            }`}>
+                              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {order.orderItems && order.orderItems.length > 0 && (
+                          <div className="space-y-2">
+                            {order.orderItems.map((item) => (
+                              <div key={item.id} className="flex items-center space-x-3">
+                                {item.product?.image && (
+                                  <img
+                                    src={item.product.image}
+                                    alt={item.product.name}
+                                    className="w-12 h-12 object-cover rounded"
+                                  />
+                                )}
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-gray-900">
+                                    {item.product?.name || 'Product'}
+                                  </p>
+                                  <p className="text-sm text-gray-600">
+                                    Qty: {item.quantity} × ${parseFloat(item.product?.price || 0).toFixed(2)}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'history' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-medium text-gray-900">Order History</h3>
+                  <p className="text-sm text-gray-600">
+                    All your past orders
+                  </p>
+                </div>
+
+                {loadingOrders ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                  </div>
+                ) : orders.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <h4 className="text-lg font-medium text-gray-900 mb-2">No order history</h4>
+                    <p className="text-gray-600 mb-6">Your completed orders will appear here.</p>
+                    <button
+                      onClick={() => window.location.href = '/products'}
+                      className="btn-primary"
+                    >
+                      Start Shopping
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {orders.map((order) => (
+                      <div key={order.id} className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <h4 className="font-medium text-gray-900">Order #{order.id}</h4>
+                            <p className="text-sm text-gray-600">
+                              {new Date(order.createdAt).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium text-gray-900">${parseFloat(order.totalPrice).toFixed(2)}</p>
+                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                              order.status === 'pending'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : order.status === 'shipped'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-green-100 text-green-800'
+                            }`}>
+                              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {order.orderItems && order.orderItems.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium text-gray-700 mb-2">
+                              Items ({order.orderItems.length}):
+                            </p>
+                            {order.orderItems.map((item) => (
+                              <div key={item.id} className="flex items-center space-x-3 bg-gray-50 rounded p-2">
+                                {item.product?.image && (
+                                  <img
+                                    src={item.product.image}
+                                    alt={item.product.name}
+                                    className="w-10 h-10 object-cover rounded"
+                                  />
+                                )}
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-gray-900">
+                                    {item.product?.name || 'Product'}
+                                  </p>
+                                  <p className="text-xs text-gray-600">
+                                    Quantity: {item.quantity} × ${parseFloat(item.product?.price || 0).toFixed(2)} = ${(item.quantity * parseFloat(item.product?.price || 0)).toFixed(2)}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 

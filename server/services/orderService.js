@@ -180,6 +180,83 @@ class OrderService {
     }
   }
 
+  // Create order from cart items
+  static async createOrderFromCart(userId) {
+    const transaction = await Order.sequelize.transaction();
+
+    try {
+      if (!userId || isNaN(userId)) {
+        throw new Error('Invalid user ID');
+      }
+
+      // Get user's cart items
+      const { Cart } = require('../models');
+      const cartItems = await Cart.findAll({
+        where: { userId },
+        include: [
+          {
+            model: Product,
+            as: 'product',
+            attributes: ['id', 'name', 'price', 'stock']
+          }
+        ]
+      });
+
+      if (cartItems.length === 0) {
+        throw new Error('Cart is empty');
+      }
+
+      // Validate items and calculate total
+      let totalPrice = 0;
+      const validatedItems = [];
+
+      for (const cartItem of cartItems) {
+        const product = cartItem.product;
+        if (!product) {
+          throw new Error(`Product not found for cart item`);
+        }
+
+        if (product.stock < cartItem.quantity) {
+          throw new Error(`Insufficient stock for product: ${product.name}`);
+        }
+
+        totalPrice += parseFloat(product.price) * cartItem.quantity;
+        validatedItems.push({
+          productId: product.id,
+          quantity: cartItem.quantity
+        });
+      }
+
+      // Create order
+      const order = await Order.create({
+        userId: userId,
+        totalPrice: totalPrice
+      }, { transaction });
+
+      // Create order items
+      for (const item of validatedItems) {
+        await OrderItem.create({
+          orderId: order.id,
+          productId: item.productId,
+          quantity: item.quantity
+        }, { transaction });
+      }
+
+      // Clear cart after successful order
+      await Cart.destroy({
+        where: { userId }
+      }, { transaction });
+
+      await transaction.commit();
+
+      // Return order with all related data
+      return await this.getOrderById(order.id);
+    } catch (error) {
+      await transaction.rollback();
+      throw new Error(`Failed to create order from cart: ${error.message}`);
+    }
+  }
+
   // Update order status
   static async updateOrderStatus(id, status) {
     try {

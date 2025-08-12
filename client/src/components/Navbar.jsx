@@ -76,6 +76,14 @@ const Navbar = () => {
             >
               Products
             </Link>
+            {isLoggedIn && (
+              <Link
+                to="/orders"
+                className="text-gray-700 hover:text-primary-600 transition-colors font-medium"
+              >
+                My Orders
+              </Link>
+            )}
           </div>
 
           {/* Desktop Right side - Cart and Auth */}
@@ -223,6 +231,15 @@ const Navbar = () => {
               >
                 Products
               </Link>
+              {isLoggedIn && (
+                <Link
+                  to="/orders"
+                  className="block px-3 py-2 text-gray-700 hover:text-primary-600 hover:bg-gray-50 rounded-md font-medium"
+                  onClick={closeMobileMenu}
+                >
+                  My Orders
+                </Link>
+              )}
 
               {/* Mobile Auth Section */}
               <div className="border-t border-gray-200 pt-2">

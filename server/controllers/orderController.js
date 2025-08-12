@@ -41,8 +41,18 @@ class OrderController {
   static async getOrdersByUserId(req, res) {
     try {
       const { userId } = req.params;
+      const requestingUserId = req.user.id;
+
+      // Users can only access their own orders
+      if (parseInt(userId) !== requestingUserId) {
+        return res.status(403).json({
+          success: false,
+          error: 'Access denied. You can only view your own orders.'
+        });
+      }
+
       const orders = await OrderService.getOrdersByUserId(userId);
-      
+
       res.json({
         success: true,
         data: orders,
@@ -60,12 +70,36 @@ class OrderController {
   static async createOrder(req, res) {
     try {
       const orderData = req.body;
+      const authenticatedUserId = req.user.id;
+
+      // Ensure the order is created for the authenticated user
+      orderData.user_id = authenticatedUserId;
+
       const order = await OrderService.createOrder(orderData);
-      
+
       res.status(201).json({
         success: true,
         data: order,
         message: 'Order created successfully'
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  // POST /orders/from-cart - Create order from cart items
+  static async createOrderFromCart(req, res) {
+    try {
+      const userId = req.user.id;
+      const order = await OrderService.createOrderFromCart(userId);
+
+      res.status(201).json({
+        success: true,
+        data: order,
+        message: 'Order created successfully from cart'
       });
     } catch (error) {
       res.status(400).json({
