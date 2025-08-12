@@ -36,6 +36,9 @@ const syncDatabase = async () => {
     require('../models/Product');
     require('../models/Order');
     require('../models/OrderItem');
+    require('../models/UserData');
+    require('../models/UserProfile');
+    require('../models/Cart');
 
     // Sync all models with database
     await sequelize.sync({ alter: true });

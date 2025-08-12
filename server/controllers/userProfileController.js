@@ -25,15 +25,19 @@ class UserProfileController {
     try {
       const userId = req.user.id;
       const profileData = req.body;
-      
+
+      console.log('Updating profile for user:', userId);
+      console.log('Profile data received:', profileData);
+
       const profile = await UserProfileService.updateUserProfile(userId, profileData);
-      
+
       res.json({
         success: true,
         data: profile,
         message: 'Profile updated successfully'
       });
     } catch (error) {
+      console.error('Profile update error in controller:', error);
       res.status(400).json({
         success: false,
         error: error.message

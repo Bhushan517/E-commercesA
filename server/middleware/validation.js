@@ -96,27 +96,52 @@ const validateUserProfile = [
     .trim()
     .isLength({ max: 20 })
     .withMessage('Phone number must be less than 20 characters')
-    .matches(/^[\d\s\-\+\(\)]+$/)
-    .withMessage('Phone number contains invalid characters'),
+    .custom((value) => {
+      // Allow empty string or valid phone format
+      if (!value || value === '') return true;
+      if (!/^[\d\s\-\+\(\)]+$/.test(value)) {
+        throw new Error('Phone number contains invalid characters');
+      }
+      return true;
+    }),
   body('address')
     .optional()
     .trim()
     .isLength({ max: 500 })
     .withMessage('Address must be less than 500 characters'),
   body('dateOfBirth')
-    .optional()
-    .isISO8601()
-    .withMessage('Date of birth must be a valid date')
+    .optional({ nullable: true, checkFalsy: true })
     .custom((value) => {
-      if (new Date(value) >= new Date()) {
+      // Allow null, undefined, empty string
+      if (!value || value === '' || value === null || value === undefined) {
+        return true;
+      }
+
+      // Check if it's a valid ISO8601 date format
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        throw new Error('Date of birth must be in YYYY-MM-DD format');
+      }
+
+      const date = new Date(value);
+      if (isNaN(date.getTime())) {
+        throw new Error('Date of birth must be a valid date');
+      }
+
+      if (date >= new Date()) {
         throw new Error('Date of birth must be in the past');
       }
+
       return true;
     }),
   body('avatar')
     .optional()
-    .isURL()
-    .withMessage('Avatar must be a valid URL'),
+    .custom((value) => {
+      // Allow base64 data URLs or regular URLs
+      if (value && !value.startsWith('data:image/') && !value.match(/^https?:\/\//)) {
+        throw new Error('Avatar must be a valid URL or base64 image data');
+      }
+      return true;
+    }),
   body('bio')
     .optional()
     .trim()

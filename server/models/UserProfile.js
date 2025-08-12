@@ -73,13 +73,8 @@ const UserProfile = sequelize.define('UserProfile', {
     }
   },
   avatar: {
-    type: DataTypes.STRING(500),
-    allowNull: true,
-    validate: {
-      isUrl: {
-        msg: 'Avatar must be a valid URL'
-      }
-    }
+    type: DataTypes.TEXT('long'), // Use LONGTEXT for large base64 images
+    allowNull: true
   },
   bio: {
     type: DataTypes.TEXT,

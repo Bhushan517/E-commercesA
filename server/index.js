@@ -23,15 +23,27 @@ const PORT = process.env.PORT || 4000;
 app.use(securityHeaders);
 app.use(logFailedAuth);
 
-// CORS configuration
+// CORS configuration - Allow all methods and headers
 app.use(cors({
   origin: ['http://localhost:3000', 'http://localhost:5173'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Add request logging
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path} - ${new Date().toISOString()}`);
+  if (req.method === 'PUT' && req.path === '/api/profile') {
+    console.log('PUT /api/profile request body:', req.body);
+    console.log('Authorization header:', req.headers.authorization);
+  }
+  next();
+});
 
 // Input sanitization
 app.use(sanitizeInput);

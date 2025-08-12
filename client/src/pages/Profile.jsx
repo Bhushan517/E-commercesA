@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { userAPI } from '../api/users';
 import { cartAPI } from '../api/cart';
 import { useToast } from '../context/ToastContext';
+import PhotoUpload from '../components/PhotoUpload';
 
 const Profile = () => {
   const { success: showSuccess, error: showError } = useToast();
@@ -42,32 +43,41 @@ const Profile = () => {
       const currentUser = userAPI.getCurrentUser();
       setUser(currentUser);
 
+      // Load saved profile data from localStorage first
+      const savedProfile = userAPI.getUserProfile();
+
       // Load profile data from backend
-      const response = await fetch('http://localhost:4001/api/profile', {
+      const response = await fetch('http://localhost:4000/api/profile', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
-      
+
+      let profileData = null;
       if (response.ok) {
-        const profileData = await response.json();
-        setProfile(profileData.data);
-        setFormData({
-          firstName: profileData.data.firstName || '',
-          lastName: profileData.data.lastName || '',
-          phone: profileData.data.phone || '',
-          address: profileData.data.address || '',
-          dateOfBirth: profileData.data.dateOfBirth || '',
-          bio: profileData.data.bio || '',
-          avatar: profileData.data.avatar || '',
-          preferences: profileData.data.preferences || {
-            theme: 'light',
-            notifications: true,
-            newsletter: false,
-            language: 'en'
-          }
-        });
+        const backendProfile = await response.json();
+        profileData = backendProfile.data;
       }
+
+      // Merge saved profile data with backend data (prioritize saved data for avatar)
+      const mergedProfile = {
+        firstName: profileData?.firstName || savedProfile?.firstName || '',
+        lastName: profileData?.lastName || savedProfile?.lastName || '',
+        phone: profileData?.phone || savedProfile?.phone || '',
+        address: profileData?.address || savedProfile?.address || '',
+        dateOfBirth: profileData?.dateOfBirth || savedProfile?.dateOfBirth || '',
+        bio: profileData?.bio || savedProfile?.bio || '',
+        avatar: savedProfile?.avatar || profileData?.avatar || '', // Prioritize saved avatar
+        preferences: profileData?.preferences || savedProfile?.preferences || {
+          theme: 'light',
+          notifications: true,
+          newsletter: false,
+          language: 'en'
+        }
+      };
+
+      setProfile(mergedProfile);
+      setFormData(mergedProfile);
     } catch (error) {
       setError('Failed to load profile data');
     } finally {
@@ -113,13 +123,22 @@ const Profile = () => {
       setSaving(true);
       setError(null);
 
-      const response = await fetch('http://localhost:4001/api/profile', {
+      // Clean the form data before sending
+      const cleanedFormData = {
+        ...formData,
+        dateOfBirth: formData.dateOfBirth || null,
+        phone: formData.phone || '',
+        address: formData.address || '',
+        bio: formData.bio || ''
+      };
+
+      const response = await fetch('http://localhost:4000/api/profile', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(cleanedFormData)
       });
 
       if (response.ok) {
@@ -128,9 +147,15 @@ const Profile = () => {
         setIsEditing(false);
         setSuccess('Profile updated successfully!');
         showSuccess('Your profile has been updated successfully!');
+
+        // Save profile data locally for avatar display
+        userAPI.saveUserProfile(formData);
+
         setTimeout(() => setSuccess(null), 3000);
       } else {
-        throw new Error('Failed to update profile');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Profile save error:', errorData);
+        throw new Error(errorData.error || 'Failed to update profile');
       }
     } catch (error) {
       setError(error.message);
@@ -163,6 +188,84 @@ const Profile = () => {
     }
   };
 
+  const handlePhotoChange = async (photoData) => {
+    // Update form data
+    const updatedFormData = {
+      ...formData,
+      avatar: photoData
+    };
+    setFormData(updatedFormData);
+
+    // If not in editing mode (i.e., first time upload), save immediately
+    if (!isEditing) {
+      try {
+        setSaving(true);
+        setError(null);
+
+        // Clean the data before sending
+        const cleanedData = {
+          firstName: updatedFormData.firstName || '',
+          lastName: updatedFormData.lastName || '',
+          phone: updatedFormData.phone || '',
+          address: updatedFormData.address || '',
+          dateOfBirth: updatedFormData.dateOfBirth || null,
+          bio: updatedFormData.bio || '',
+          avatar: updatedFormData.avatar || null,
+          preferences: updatedFormData.preferences || {
+            theme: 'light',
+            notifications: true,
+            newsletter: false,
+            language: 'en'
+          }
+        };
+
+        // Remove empty strings and replace with null for optional fields
+        if (!cleanedData.dateOfBirth || cleanedData.dateOfBirth === '') {
+          cleanedData.dateOfBirth = null;
+        }
+        if (!cleanedData.phone || cleanedData.phone === '') {
+          cleanedData.phone = '';
+        }
+
+        console.log('Sending profile data:', cleanedData);
+
+        const response = await fetch('http://localhost:4000/api/profile', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify(cleanedData)
+        });
+
+        if (response.ok) {
+          const updatedProfile = await response.json();
+          setProfile(updatedProfile.data);
+
+          // Save profile data locally for avatar display
+          userAPI.saveUserProfile(updatedFormData);
+
+          showSuccess('Profile photo uploaded successfully!');
+        } else {
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          console.error('Profile update error:', errorData);
+          console.error('Validation details:', errorData.details);
+          throw new Error(errorData.error || 'Failed to save profile photo');
+        }
+      } catch (error) {
+        setError(error.message);
+        showError(error.message);
+        // Revert the photo change on error
+        setFormData(prev => ({
+          ...prev,
+          avatar: formData.avatar
+        }));
+      } finally {
+        setSaving(false);
+      }
+    }
+  };
+
   const getInitials = (name) => {
     return name
       .split(' ')
@@ -188,26 +291,13 @@ const Profile = () => {
           <div className="px-6 py-8">
             <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6">
               {/* Avatar */}
-              <div className="relative">
-                <div className="w-24 h-24 rounded-full bg-gradient-to-r from-primary-500 to-primary-600 flex items-center justify-center text-white text-2xl font-bold shadow-lg">
-                  {formData.avatar ? (
-                    <img 
-                      src={formData.avatar} 
-                      alt="Profile" 
-                      className="w-24 h-24 rounded-full object-cover"
-                    />
-                  ) : (
-                    getInitials(user?.name || 'User')
-                  )}
-                </div>
-                {isEditing && (
-                  <button className="absolute bottom-0 right-0 bg-primary-600 text-white rounded-full p-2 shadow-lg hover:bg-primary-700 transition-colors">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </button>
-                )}
+              <div className="flex-shrink-0">
+                <PhotoUpload
+                  currentPhoto={formData.avatar}
+                  onPhotoChange={handlePhotoChange}
+                  isEditing={isEditing || !formData.avatar} // Allow upload if no photo exists
+                  autoSave={!isEditing && !formData.avatar} // Auto-save when uploading first photo
+                />
               </div>
 
               {/* User Info */}

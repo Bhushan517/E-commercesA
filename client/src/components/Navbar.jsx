@@ -4,6 +4,7 @@ import { useCart } from '../context/CartContext';
 import { userAPI } from '../api/users';
 import { useToast } from '../context/ToastContext';
 import { useConfirmation } from '../context/ConfirmationContext';
+import UserAvatar from './UserAvatar';
 
 const Navbar = () => {
   const { getTotalItems, loadCart } = useCart();
@@ -101,9 +102,7 @@ const Navbar = () => {
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                   className="flex items-center space-x-2 text-gray-700 hover:text-primary-600 transition-colors"
                 >
-                  <div className="w-8 h-8 bg-primary-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
-                    {currentUser?.name?.charAt(0).toUpperCase()}
-                  </div>
+                  <UserAvatar size="md" />
                   <span className="hidden md:block">{currentUser?.name}</span>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />

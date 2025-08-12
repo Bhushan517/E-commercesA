@@ -85,6 +85,25 @@ export const userAPI = {
     return !!localStorage.getItem('token');
   },
 
+  // Get user profile data
+  getUserProfile: () => {
+    try {
+      const profileData = localStorage.getItem('userProfile');
+      return profileData ? JSON.parse(profileData) : null;
+    } catch (error) {
+      return null;
+    }
+  },
+
+  // Save user profile data
+  saveUserProfile: (profileData) => {
+    try {
+      localStorage.setItem('userProfile', JSON.stringify(profileData));
+    } catch (error) {
+      console.error('Failed to save profile data:', error);
+    }
+  },
+
   // Update user
   updateUser: async (id, userData) => {
     try {
