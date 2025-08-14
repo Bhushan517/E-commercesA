@@ -94,6 +94,40 @@ class ProductService {
     }
   }
 
+  // Get all categories
+  static async getAllCategories() {
+    try {
+      const categories = await Product.findAll({
+        attributes: ['category'],
+        where: {
+          category: {
+            [require('sequelize').Op.ne]: null
+          }
+        },
+        group: ['category'],
+        raw: true
+      });
+
+      // Format categories with counts
+      const categoriesWithCounts = await Promise.all(
+        categories.map(async (cat) => {
+          const count = await Product.count({
+            where: { category: cat.category }
+          });
+          return {
+            name: cat.category,
+            count: count,
+            slug: cat.category.toLowerCase().replace(/\s+/g, '-')
+          };
+        })
+      );
+
+      return categoriesWithCounts.sort((a, b) => a.name.localeCompare(b.name));
+    } catch (error) {
+      throw new Error(`Failed to fetch categories: ${error.message}`);
+    }
+  }
+
   // Get products by category
   static async getProductsByCategory(category) {
     try {

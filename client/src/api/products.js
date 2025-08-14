@@ -52,6 +52,16 @@ export const productAPI = {
     }
   },
 
+  // Get all categories
+  getAllCategories: async () => {
+    try {
+      const response = await api.get('/products/categories');
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch categories');
+    }
+  },
+
   // Get products by category
   getProductsByCategory: async (category) => {
     try {

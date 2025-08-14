@@ -1,24 +1,55 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { productAPI } from '../api/products';
 import ProductCard from '../components/ProductCard';
 
 const ProductList = () => {
+  const location = useLocation();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [categories, setCategories] = useState([]);
+  const [filteredProducts, setFilteredProducts] = useState([]);
 
   useEffect(() => {
     fetchProducts();
+    loadCategories();
   }, []);
 
+  // Handle URL parameters for search and category
   useEffect(() => {
-    // Extract unique categories from products
-    const uniqueCategories = [...new Set(products.map(p => p.category).filter(Boolean))];
-    setCategories(uniqueCategories);
-  }, [products]);
+    const urlParams = new URLSearchParams(location.search);
+    const searchParam = urlParams.get('search');
+    const categoryParam = urlParams.get('category');
+
+    if (searchParam) {
+      setSearchTerm(searchParam);
+    }
+    if (categoryParam) {
+      setSelectedCategory(categoryParam);
+    }
+  }, [location]);
+
+  // Filter products based on search and category
+  useEffect(() => {
+    let filtered = products;
+
+    if (searchTerm) {
+      filtered = filtered.filter(product =>
+        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.category?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    if (selectedCategory) {
+      filtered = filtered.filter(product => product.category === selectedCategory);
+    }
+
+    setFilteredProducts(filtered);
+  }, [products, searchTerm, selectedCategory]);
 
   const fetchProducts = async () => {
     try {
@@ -33,49 +64,27 @@ const ProductList = () => {
     }
   };
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    if (!searchTerm.trim()) {
-      fetchProducts();
-      return;
-    }
-
+  const loadCategories = async () => {
     try {
-      setLoading(true);
-      setError(null);
-      const response = await productAPI.searchProducts(searchTerm);
-      setProducts(response.data);
+      const response = await productAPI.getAllCategories();
+      setCategories(response.data || []);
     } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+      console.error('Failed to load categories:', err);
     }
   };
 
-  const handleCategoryFilter = async (category) => {
-    setSelectedCategory(category);
-    
-    if (!category) {
-      fetchProducts();
-      return;
-    }
+  const handleSearch = (e) => {
+    e.preventDefault();
+    // Filtering is handled by useEffect
+  };
 
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await productAPI.getProductsByCategory(category);
-      setProducts(response.data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+  const handleCategoryFilter = (category) => {
+    setSelectedCategory(category);
   };
 
   const clearFilters = () => {
     setSearchTerm('');
     setSelectedCategory('');
-    fetchProducts();
   };
 
   return (
@@ -119,8 +128,8 @@ const ProductList = () => {
             >
               <option value="">All Categories</option>
               {categories.map((category) => (
-                <option key={category} value={category}>
-                  {category}
+                <option key={category.name} value={category.name}>
+                  {category.name} ({category.count})
                 </option>
               ))}
             </select>
@@ -182,16 +191,18 @@ const ProductList = () => {
         </div>
       ) : (
         <>
-          {products.length > 0 ? (
+          {filteredProducts.length > 0 ? (
             <>
               <div className="mb-4">
                 <p className="text-gray-600">
-                  Showing {products.length} product{products.length !== 1 ? 's' : ''}
+                  Showing {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''}
+                  {searchTerm && ` for "${searchTerm}"`}
+                  {selectedCategory && ` in "${selectedCategory}"`}
                 </p>
               </div>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {products.map((product) => (
+                {filteredProducts.map((product) => (
                   <ProductCard key={product.id} product={product} />
                 ))}
               </div>

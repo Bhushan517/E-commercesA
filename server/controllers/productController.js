@@ -96,6 +96,22 @@ class ProductController {
     }
   }
 
+  // GET /products/categories - Get all categories
+  static async getAllCategories(req, res) {
+    try {
+      const categories = await ProductService.getAllCategories();
+      res.json({
+        success: true,
+        data: categories
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
   // GET /products/category/:category - Get products by category
   static async getProductsByCategory(req, res) {
     try {
